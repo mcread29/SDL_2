@@ -14,6 +14,10 @@ and may not be redistributed without written permission.*/
 const int SCREEN_WIDTH = 640;
 const int SCREEN_HEIGHT = 480;
 
+const int WORLD_WIDTH = 100;
+const int WORLD_HEIGHT = 60;
+const int SCALE = 10;
+
 //Key press surfaces constants
 enum KeyPressSurfaces
 {
@@ -53,7 +57,7 @@ bool init()
 	else
 	{
 		//Create window
-		gWindow = SDL_CreateWindow("SDL Tutorial", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
+		gWindow = SDL_CreateWindow("SDL Tutorial", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WORLD_WIDTH * SCALE, WORLD_HEIGHT * SCALE, SDL_WINDOW_SHOWN);
 		if (gWindow == NULL)
 		{
 			printf("Window could not be created! SDL Error: %s\n", SDL_GetError());
@@ -134,38 +138,57 @@ int main(int argc, char *args[])
 			SDL_Event e;
 
 			// Define the gravity vector.
-			b2Vec2 gravity(0.0f, 1.0f);
+			b2Vec2 gravity(0.0f, 0.15f);
 
 			// Construct a world object, which will hold and simulate the rigid bodies.
 			b2World world(gravity);
 
-			const SDL_Rect groundRect = {0, SCREEN_HEIGHT - 5, SCREEN_WIDTH, 11};
+			const float groundX = WORLD_WIDTH / 2;
+			const float groundY = WORLD_HEIGHT;
+			const float groundW = WORLD_WIDTH;
+			const float groundH = 1;
+
 			b2BodyDef groundBodyDef;
-			groundBodyDef.position.Set(groundRect.x, groundRect.y);
+			groundBodyDef.type = b2_staticBody;
+			groundBodyDef.position.Set(groundX, groundY);
+
 			b2Body *groundBody = world.CreateBody(&groundBodyDef);
+
 			b2PolygonShape groundBox;
-			groundBox.SetAsBox(groundRect.w / 2, groundRect.h / 2);
+			groundBox.SetAsBox(groundW / 2, groundH / 2);
+
 			groundBody->CreateFixture(&groundBox, 0.0f);
 
-			const SDL_Rect boxRect = {SCREEN_WIDTH / 2, 0, 55, 55};
-			b2BodyDef bodyDef;
-			bodyDef.type = b2_dynamicBody;
-			bodyDef.position.Set(boxRect.x, boxRect.y);
-			b2Body *body = world.CreateBody(&bodyDef);
-			b2PolygonShape dynamicBox;
-			dynamicBox.SetAsBox(boxRect.w / 2, boxRect.h / 2);
-			b2FixtureDef fixtureDef;
-			fixtureDef.shape = &dynamicBox;
-			fixtureDef.density = 1.0f;
-			fixtureDef.friction = 0.3f;
-			body->CreateFixture(&fixtureDef);
+			const float boxX = WORLD_WIDTH / 2;
+			const float boxY = 0;
+			const float boxW = 10.0f;
+			const float boxH = boxW;
+
+			b2BodyDef boxBodyDef;
+			boxBodyDef.type = b2_dynamicBody;
+			boxBodyDef.position.Set(boxX, boxY);
+			boxBodyDef.gravityScale = 0.5f;
+
+			b2Body *boxBody = world.CreateBody(&boxBodyDef);
+
+			b2PolygonShape boxBox;
+			boxBox.SetAsBox(boxW / 2, boxH / 2);
+
+			b2FixtureDef boxFixtureDef;
+			boxFixtureDef.shape = &boxBox;
+			boxFixtureDef.density = 1.0f;
+			boxFixtureDef.friction = 0.3f;
+
+			boxBody->CreateFixture(&boxFixtureDef);
 
 			float32 timeStep = 1.0f / 60.0f;
 			int32 velocityIterations = 6;
 			int32 positionIterations = 2;
 
-			Texture character = Texture(textureManager.getTexture("character"), {boxRect});
-			Texture ground = Texture(textureManager.getTexture("ground"), {groundRect});
+			Texture character = Texture(textureManager.getTexture("character"), boxX, boxY, boxW, boxH, SCALE);
+			Texture ground = Texture(textureManager.getTexture("ground"), groundX, groundY, groundW, groundH, SCALE);
+
+			int remainingJumpSteps = 0;
 
 			//While application is running
 			while (!quit)
@@ -178,17 +201,61 @@ int main(int argc, char *args[])
 					{
 						quit = true;
 					}
+					else if (e.type == SDL_KEYDOWN)
+					{
+						//Select surfaces based on key press
+						float impulse;
+						b2Vec2 vel;
+						switch (e.key.keysym.sym)
+						{
+						case SDLK_UP:
+							vel = boxBody->GetLinearVelocity();
+							vel.y = 0;
+							boxBody->SetLinearVelocity(vel);
+							impulse = boxBody->GetMass() * 2.5f;
+							boxBody->ApplyLinearImpulse(b2Vec2(0, -impulse), boxBody->GetWorldCenter(), true);
+							break;
+
+						case SDLK_LEFT:
+							printf("PRESSED LEFT\n");
+							boxBody->ApplyForce(b2Vec2(-20, 0), boxBody->GetWorldCenter(), true);
+							break;
+
+						case SDLK_RIGHT:
+							printf("PRESSED RIGHT\n");
+							boxBody->ApplyForce(b2Vec2(20, 0), boxBody->GetWorldCenter(), true);
+							break;
+
+						default:
+							vel = boxBody->GetLinearVelocity();
+							vel.x = 0;
+							boxBody->SetLinearVelocity(vel);
+							break;
+						}
+					}
 				}
 
+				b2Vec2 vel = boxBody->GetLinearVelocity();
+				if (vel.x > 10)
+					vel.x = 10;
+				if (vel.x < -10)
+					vel.x = -10;
+				boxBody->SetLinearVelocity(vel);
 				world.Step(timeStep, velocityIterations, positionIterations);
+				// if (remainingJumpSteps > 0)
+				// {
+				// 	float impulse = boxBody->GetMass();
+				// 	boxBody->ApplyLinearImpulse(b2Vec2(0, -impulse), boxBody->GetWorldCenter(), true);
+				// }
 
-				b2Vec2 position = body->GetPosition();
-				float32 angle = body->GetAngle();
+				b2Vec2 position = boxBody->GetPosition();
+				float32 angle = boxBody->GetAngle();
 
 				b2Vec2 gPos = groundBody->GetPosition();
 
-				character.setPosition(position.x, position.y - boxRect.h / 2);
-				ground.setPosition(gPos.x, gPos.y - groundRect.h / 2);
+				character.setPosition(position.x, position.y);
+				character.setAngle(angle);
+				ground.setPosition(gPos.x, gPos.y);
 
 				SDL_RenderClear(gRenderer);
 				ground.render(gRenderer);

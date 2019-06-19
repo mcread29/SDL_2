@@ -35,7 +35,8 @@
 			"streambuf": "cpp",
 			"system_error": "cpp",
 			"tuple": "cpp",
-			"utility": "cpp"
+			"utility": "cpp",
+			"string": "cpp"
 		}
 	}
 }
