@@ -138,14 +138,14 @@ int main(int argc, char *args[])
 			SDL_Event e;
 
 			// Define the gravity vector.
-			b2Vec2 gravity(0.0f, 0.15f);
+			b2Vec2 gravity(0.0f, 10.0f);
 
 			// Construct a world object, which will hold and simulate the rigid bodies.
 			b2World world(gravity);
 
 			const float groundX = WORLD_WIDTH / 2;
 			const float groundY = WORLD_HEIGHT;
-			const float groundW = WORLD_WIDTH;
+			const float groundW = WORLD_WIDTH * 10;
 			const float groundH = 1;
 
 			b2BodyDef groundBodyDef;
@@ -190,9 +190,18 @@ int main(int argc, char *args[])
 
 			int remainingJumpSteps = 0;
 
+			Uint32 lastTick = SDL_GetTicks();
 			//While application is running
 			while (!quit)
 			{
+				Uint32 deltaTime = 0;
+				// float check = 1.0f / 60.0f * 1000.0f;
+				// while (deltaTime < check)
+				// {
+				Uint32 tick = SDL_GetTicks();
+				deltaTime += tick - lastTick;
+				lastTick = tick;
+				// }
 				//Handle events on queue
 				while (SDL_PollEvent(&e) != 0)
 				{
@@ -209,44 +218,29 @@ int main(int argc, char *args[])
 						switch (e.key.keysym.sym)
 						{
 						case SDLK_UP:
-							vel = boxBody->GetLinearVelocity();
-							vel.y = 0;
-							boxBody->SetLinearVelocity(vel);
-							impulse = boxBody->GetMass() * 2.5f;
+							impulse = boxBody->GetMass() * 20.0f;
 							boxBody->ApplyLinearImpulse(b2Vec2(0, -impulse), boxBody->GetWorldCenter(), true);
 							break;
 
 						case SDLK_LEFT:
-							printf("PRESSED LEFT\n");
-							boxBody->ApplyForce(b2Vec2(-20, 0), boxBody->GetWorldCenter(), true);
+							vel = boxBody->GetLinearVelocity();
+							vel.x = -3;
+							boxBody->SetLinearVelocity(vel);
 							break;
 
 						case SDLK_RIGHT:
-							printf("PRESSED RIGHT\n");
-							boxBody->ApplyForce(b2Vec2(20, 0), boxBody->GetWorldCenter(), true);
+							vel = boxBody->GetLinearVelocity();
+							vel.x = 3;
+							boxBody->SetLinearVelocity(vel);
 							break;
 
 						default:
-							vel = boxBody->GetLinearVelocity();
-							vel.x = 0;
-							boxBody->SetLinearVelocity(vel);
 							break;
 						}
 					}
 				}
 
-				b2Vec2 vel = boxBody->GetLinearVelocity();
-				if (vel.x > 10)
-					vel.x = 10;
-				if (vel.x < -10)
-					vel.x = -10;
-				boxBody->SetLinearVelocity(vel);
-				world.Step(timeStep, velocityIterations, positionIterations);
-				// if (remainingJumpSteps > 0)
-				// {
-				// 	float impulse = boxBody->GetMass();
-				// 	boxBody->ApplyLinearImpulse(b2Vec2(0, -impulse), boxBody->GetWorldCenter(), true);
-				// }
+				world.Step(deltaTime / 60.0f, velocityIterations, positionIterations);
 
 				b2Vec2 position = boxBody->GetPosition();
 				float32 angle = boxBody->GetAngle();
