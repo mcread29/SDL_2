@@ -36,7 +36,9 @@
 			"system_error": "cpp",
 			"tuple": "cpp",
 			"utility": "cpp",
-			"string": "cpp"
+			"string": "cpp",
+			"deque": "cpp",
+			"memory": "cpp"
 		}
 	}
 }

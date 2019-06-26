@@ -6,7 +6,9 @@ and may not be redistributed without written permission.*/
 #include <SDL_image.h>
 #include <stdio.h>
 #include <string>
+#include <algorithm>
 #include "Box2D/Box2D.h"
+// #include "camera.h"
 #include "textureManager.h"
 #include "texture.h"
 
@@ -14,9 +16,9 @@ and may not be redistributed without written permission.*/
 const int SCREEN_WIDTH = 640;
 const int SCREEN_HEIGHT = 480;
 
-const int WORLD_WIDTH = 100;
-const int WORLD_HEIGHT = 60;
-const int SCALE = 10;
+const int WORLD_WIDTH = 192;
+const int WORLD_HEIGHT = 108;
+const int SCALE = 5;
 
 //Key press surfaces constants
 enum KeyPressSurfaces
@@ -138,7 +140,7 @@ int main(int argc, char *args[])
 			SDL_Event e;
 
 			// Define the gravity vector.
-			b2Vec2 gravity(0.0f, 10.0f);
+			b2Vec2 gravity(0.0f, 6.0f);
 
 			// Construct a world object, which will hold and simulate the rigid bodies.
 			b2World world(gravity);
@@ -188,6 +190,15 @@ int main(int argc, char *args[])
 			Texture character = Texture(textureManager.getTexture("character"), boxX, boxY, boxW, boxH, SCALE);
 			Texture ground = Texture(textureManager.getTexture("ground"), groundX, groundY, groundW, groundH, SCALE);
 
+			Camera *camera = new Camera(WORLD_WIDTH, WORLD_HEIGHT);
+			camera->setCameraTarget(character.position);
+
+			bool *keyPressStates = new bool[KEY_PRESS_SURFACE_TOTAL];
+			for (int i = 0; i < KEY_PRESS_SURFACE_TOTAL; i++)
+			{
+				keyPressStates[i] = false;
+			}
+
 			int remainingJumpSteps = 0;
 
 			Uint32 lastTick = SDL_GetTicks();
@@ -218,20 +229,35 @@ int main(int argc, char *args[])
 						switch (e.key.keysym.sym)
 						{
 						case SDLK_UP:
-							impulse = boxBody->GetMass() * 20.0f;
+							vel = boxBody->GetLinearVelocity();
+							vel.x = 0;
+							boxBody->SetLinearVelocity(vel);
+							impulse = boxBody->GetMass() * 30.0f;
 							boxBody->ApplyLinearImpulse(b2Vec2(0, -impulse), boxBody->GetWorldCenter(), true);
 							break;
 
 						case SDLK_LEFT:
-							vel = boxBody->GetLinearVelocity();
-							vel.x = -3;
-							boxBody->SetLinearVelocity(vel);
+							keyPressStates[KEY_PRESS_SURFACE_LEFT] = true;
 							break;
 
 						case SDLK_RIGHT:
-							vel = boxBody->GetLinearVelocity();
-							vel.x = 3;
-							boxBody->SetLinearVelocity(vel);
+							keyPressStates[KEY_PRESS_SURFACE_RIGHT] = true;
+							break;
+
+						default:
+							break;
+						}
+					}
+					else if (e.type == SDL_KEYUP)
+					{
+						switch (e.key.keysym.sym)
+						{
+						case SDLK_LEFT:
+							keyPressStates[KEY_PRESS_SURFACE_LEFT] = false;
+							break;
+
+						case SDLK_RIGHT:
+							keyPressStates[KEY_PRESS_SURFACE_RIGHT] = false;
 							break;
 
 						default:
@@ -239,6 +265,14 @@ int main(int argc, char *args[])
 						}
 					}
 				}
+				b2Vec2 vel = boxBody->GetLinearVelocity();
+				if (keyPressStates[KEY_PRESS_SURFACE_LEFT])
+					vel.x = std::max(vel.x - 3, -3.0f);
+				if (keyPressStates[KEY_PRESS_SURFACE_RIGHT])
+					vel.x = std::min(vel.x + 3, 3.0f);
+
+				printf("%f %f\n", vel.x, vel.y);
+				boxBody->SetLinearVelocity(vel);
 
 				world.Step(deltaTime / 60.0f, velocityIterations, positionIterations);
 
@@ -251,9 +285,10 @@ int main(int argc, char *args[])
 				character.setAngle(angle);
 				ground.setPosition(gPos.x, gPos.y);
 
+				camera->update();
 				SDL_RenderClear(gRenderer);
-				ground.render(gRenderer);
-				character.render(gRenderer);
+				ground.render(gRenderer, camera);
+				character.render(gRenderer, camera);
 				SDL_RenderPresent(gRenderer);
 			}
 		}
